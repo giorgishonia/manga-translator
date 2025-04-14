@@ -26,5 +26,11 @@ class CustomTranslation(GPTTranslation):
         self.api_key = credentials.get('api_key', '')
         self.model = credentials.get('model', '')
         
-        # Override the API base URL with the custom one
-        self.api_base_url = credentials.get('api_url', '').rstrip('/')
+        # Override the API base URL with the custom one, ensuring we don't have duplicated path segments
+        api_url = credentials.get('api_url', '').rstrip('/')
+        
+        # For OpenRouter, ensure we don't append "/chat/completions" twice
+        if api_url.endswith('/chat/completions'):
+            self.api_base_url = api_url
+        else:
+            self.api_base_url = api_url

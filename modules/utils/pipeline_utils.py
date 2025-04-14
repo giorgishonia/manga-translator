@@ -23,6 +23,7 @@ language_codes = {
     "Russian": "ru",
     "French": "fr",
     "German": "de",
+    "Georgian": "ka",
     "Dutch": "nl",
     "Spanish": "es",
     "Italian": "it",

@@ -55,7 +55,24 @@ class BaseLLMTranslation(LLMTranslation):
             set_texts_from_json(blk_list, entire_translated_text)
         
         except Exception as e:
-            print(f"{type(self).__name__} translation error: {str(e)}")
+            error_message = str(e)
+            print(f"{type(self).__name__} translation error: {error_message}")
+            
+            # If it's a rate limit error, show a clear message in the translation
+            if "rate limit" in error_message.lower() or "429" in error_message:
+                # Extract provider name if present
+                provider = "API provider"
+                if "for " in error_message and ":" in error_message:
+                    provider_section = error_message.split("for ")[1].split(":")[0].strip()
+                    if provider_section:
+                        provider = provider_section
+                
+                error_display = f"[Rate limit exceeded for {provider}. Please try again later or use a different service.]"
+                
+                # Set this error message as the translation for each block
+                for blk in blk_list:
+                    if blk.text and blk.text.strip():
+                        blk.translation = error_display
             
         return blk_list
     

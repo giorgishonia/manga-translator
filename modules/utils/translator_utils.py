@@ -74,7 +74,7 @@ def set_upper_case(blk_list: List[TextBlock], upper_case: bool):
 def format_translations(blk_list: List[TextBlock], trg_lng_cd: str, upper_case: bool =True):
     for blk in blk_list:
         translation = blk.translation
-        if any(lang in trg_lng_cd.lower() for lang in ['zh', 'ja', 'th']):
+        if trg_lng_cd is not None and any(lang in trg_lng_cd.lower() for lang in ['zh', 'ja', 'th']):
 
             import stanza
 

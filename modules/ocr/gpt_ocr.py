@@ -117,7 +117,7 @@ class GPTOCR(OCREngine):
             # Parse response
             if response.status_code == 200:
                 response_json = response.json()
-                text = response_json['choices'][0]['message']['content']
+                text = self._extract_text_from_response(response_json)
                 # Replace newlines with spaces
                 return text.replace('\n', ' ') if '\n' in text else text
             else:
@@ -127,3 +127,50 @@ class GPTOCR(OCREngine):
         except Exception as e:
             print(f"GPT API request error: {str(e)}")
             return ""
+            
+    def _extract_text_from_response(self, response_data):
+        """
+        Extract text from API response, handling different response formats.
+        
+        Args:
+            response_data: JSON response from the API
+            
+        Returns:
+            Extracted text
+        """
+        # First check for error responses
+        if "error" in response_data:
+            error_info = response_data["error"]
+            error_message = error_info.get("message", "Unknown API error")
+            error_code = error_info.get("code", "unknown")
+            
+            # Handle rate limiting specifically
+            if error_code == 429 or "rate limit" in error_message.lower():
+                provider = error_info.get("metadata", {}).get("provider_name", "API provider")
+                error_msg = f"Rate limit exceeded for {provider}: {error_message}"
+            else:
+                error_msg = f"API error ({error_code}): {error_message}"
+                
+            print(f"API error during OCR: {error_msg}")
+            return f"[OCR Error: {error_msg}]"
+            
+        # Standard OpenAI format
+        if "choices" in response_data:
+            if len(response_data["choices"]) > 0:
+                choice = response_data["choices"][0]
+                if "message" in choice and "content" in choice["message"]:
+                    return choice["message"]["content"]
+                elif "text" in choice:  # Some APIs return text directly
+                    return choice["text"]
+        
+        # Handle Anthropic Claude and similar formats
+        if "content" in response_data:
+            return response_data["content"]
+            
+        # Handle other potential formats
+        if "response" in response_data:
+            return response_data["response"]
+            
+        # If we can't find a standard format, log and return empty
+        print(f"Unexpected API response format: {json.dumps(response_data)[:500]}...")
+        return "[OCR Error: Unrecognized API response format]"

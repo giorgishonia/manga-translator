@@ -96,8 +96,14 @@ class GPTTranslation(BaseLLMTranslation):
         Make API request and process response
         """
         try:
+            # Check if the API base URL already contains the /chat/completions endpoint
+            if self.api_base_url.endswith('/chat/completions'):
+                api_url = self.api_base_url
+            else:
+                api_url = f"{self.api_base_url}/chat/completions"
+                
             response = requests.post(
-                f"{self.api_base_url}/chat/completions",
+                api_url,
                 headers=headers,
                 data=json.dumps(payload)
             )
@@ -105,13 +111,62 @@ class GPTTranslation(BaseLLMTranslation):
             response.raise_for_status()
             response_data = response.json()
             
-            return response_data["choices"][0]["message"]["content"]
+            # First check for error responses
+            if "error" in response_data:
+                error_info = response_data["error"]
+                error_message = error_info.get("message", "Unknown API error")
+                error_code = error_info.get("code", "unknown")
+                
+                # Handle rate limiting specifically
+                if error_code == 429 or "rate limit" in error_message.lower():
+                    provider = error_info.get("metadata", {}).get("provider_name", "API provider")
+                    raise RuntimeError(f"Rate limit exceeded for {provider}: {error_message}")
+                
+                # Handle other errors
+                raise RuntimeError(f"API error ({error_code}): {error_message}")
+            
+            # Handle different API response formats
+            if "choices" in response_data:
+                # Standard OpenAI format
+                if len(response_data["choices"]) > 0:
+                    # Handle potential differences in response structure
+                    choice = response_data["choices"][0]
+                    if "message" in choice and "content" in choice["message"]:
+                        return choice["message"]["content"]
+                    elif "text" in choice:  # Some APIs return text directly
+                        return choice["text"]
+            
+            # Handle Anthropic Claude and similar formats
+            if "content" in response_data:
+                return response_data["content"]
+                
+            # Handle other potential formats
+            if "response" in response_data:
+                return response_data["response"]
+                
+            # If we can't find a standard format, log and raise an error
+            print(f"Unexpected API response format: {json.dumps(response_data)[:500]}...")
+            raise ValueError(f"Couldn't extract text from API response: response format not recognized")
+            
         except requests.exceptions.RequestException as e:
             error_msg = f"API request failed: {str(e)}"
             if hasattr(e, 'response') and e.response is not None:
                 try:
                     error_details = e.response.json()
-                    error_msg += f" - {json.dumps(error_details)}"
+                    if "error" in error_details:
+                        # Extract and format error information if available
+                        error_info = error_details["error"]
+                        error_message = error_info.get("message", "Unknown error")
+                        error_code = error_info.get("code", e.response.status_code)
+                        
+                        # Special handling for rate limit errors
+                        if error_code == 429 or "rate limit" in error_message.lower():
+                            provider = error_info.get("metadata", {}).get("provider_name", "API provider")
+                            error_msg = f"Rate limit exceeded for {provider}: {error_message}"
+                        else:
+                            error_msg = f"API error ({error_code}): {error_message}"
+                    else:
+                        error_msg += f" - {json.dumps(error_details)}"
                 except:
                     error_msg += f" - Status code: {e.response.status_code}"
             raise RuntimeError(error_msg)

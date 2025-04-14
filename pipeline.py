@@ -311,7 +311,14 @@ class ComicTranslatePipeline:
             render_settings = self.main_page.render_settings()
             upper_case = render_settings.upper_case
             outline = render_settings.outline
-            format_translations(blk_list, trg_lng_cd, upper_case=upper_case)
+            
+            # Add null check before using trg_lng_cd
+            if trg_lng_cd is not None:
+                format_translations(blk_list, trg_lng_cd, upper_case=upper_case)
+            else:
+                # Fallback to format without language code
+                format_translations(blk_list, '', upper_case=upper_case)
+                
             get_best_render_area(blk_list, image, inpaint_input_img)
 
             font = render_settings.font_family
@@ -345,7 +352,7 @@ class ComicTranslatePipeline:
                 if index == self.main_page.curr_img_idx:
                     self.main_page.blk_rendered.emit(translation, font_size, blk)
 
-                if any(lang in trg_lng_cd.lower() for lang in ['zh', 'ja', 'th']):
+                if trg_lng_cd is not None and any(lang in trg_lng_cd.lower() for lang in ['zh', 'ja', 'th']):
                     translation = translation.replace(' ', '')
 
                 text_items_state.append({
