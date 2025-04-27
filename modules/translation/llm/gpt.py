@@ -102,13 +102,25 @@ class GPTTranslation(BaseLLMTranslation):
             else:
                 api_url = f"{self.api_base_url}/chat/completions"
                 
+            print(f"--- Custom API Request ---")
+            print(f"URL: {api_url}")
+            # Avoid printing full payload if too large, maybe just keys or small parts
+            print(f"Payload Model: {payload.get('model')}")
+            # print(f"Payload Messages: {json.dumps(payload.get('messages', []), indent=2)[:1000]}...") # Example: limit payload logging
+            
             response = requests.post(
                 api_url,
                 headers=headers,
                 data=json.dumps(payload)
             )
             
-            response.raise_for_status()
+            print(f"--- Custom API Response ---")
+            print(f"Status Code: {response.status_code}")
+            raw_response_text = response.text
+            print(f"Raw Response Text (first 1000 chars):\n{raw_response_text[:1000]}{'...' if len(raw_response_text) > 1000 else ''}")
+            
+            response.raise_for_status() # Raise HTTP errors after printing
+            
             response_data = response.json()
             
             # First check for error responses
@@ -169,4 +181,7 @@ class GPTTranslation(BaseLLMTranslation):
                         error_msg += f" - {json.dumps(error_details)}"
                 except:
                     error_msg += f" - Status code: {e.response.status_code}"
+            # Also print the raw response text on general request exceptions
+            print(f"--- Custom API Request Exception ---")
+            print(f"Raw Response Text on Exception (if available):\n{getattr(e.response, 'text', 'N/A')[:1000]}...")
             raise RuntimeError(error_msg)
